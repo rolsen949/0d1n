@@ -1,5 +1,15 @@
 #include "string_ops.h"
 #include "mem_ops.h"
+#include "strsec.h"
+
+
+void deadspace(char *str)
+{
+    char *p = str;
+    do *(*p == ' ' ? str : str++) = *p;
+    while (*p++);
+}
+
 
 void *entropy_clock(void)
 {
@@ -64,9 +74,10 @@ void chomp(char * str)
 
 char *payload_injector(char * ptr,char * payload,int counter)
 {
-	char *new=xmalloc((strlen(ptr)+strlen(payload)+2)*sizeof(char));
+	size_t len_ptr=strlen(ptr),len_payload=strlen(payload),total_len=len_ptr+len_payload;
+	char *new=xmallocarray((total_len+1),sizeof(char));
 	short i=0,x=1;
-	memset(new, 0,sizeof(char)*(strlen(ptr)+strlen(payload)+1));
+	memset(new, 0,(total_len)*sizeof(char));
 
 	while(*ptr != '\0')
 	{
@@ -74,8 +85,8 @@ char *payload_injector(char * ptr,char * payload,int counter)
 		{
 			if(counter==x)
 			{
-				strncat(new,payload,strlen(payload));
-				i+=strlen(payload);
+				strlcat(new,payload,total_len+1);
+				i+=len_payload;
 			}
 			x++;
 		} 
@@ -121,7 +132,6 @@ strstr_regex(char *string, char *expression)
 }
 
 
-
 char *replace(char *instring,char *old,char *new)
 { 
 	int instring_size=strlen(instring),new_size=strlen(new),old_size=strlen(old),out_size=instring_size+1,count=0;
@@ -136,7 +146,7 @@ char *replace(char *instring,char *old,char *new)
  	if(instring_size<old_size || !old_size)
 	{       
 		strcpy(out, instring);
- 		free(tmp);
+ 		XFREE(tmp);
 		return out;
 	}   
 
@@ -146,19 +156,21 @@ char *replace(char *instring,char *old,char *new)
 	{       
 		strncpy(tmp,(instring+count),old_size);
 		tmp[old_size]='\0';
+
 		if(!strcmp(tmp,old))
 		{
 			if(new_size!=old_size)
 			{
 				out_size=out_size+new_size-old_size;
-				out=xrealloc(out,out_size);
+				out=xreallocarray(out,out_size,sizeof(char));
 
 				if(!out)
 				{
-					free(tmp);
+					XFREE(tmp);
 					return NULL;
 				}
 			}
+
 			strcat(out,new);
 			count=count+old_size-1;
 		}else{
@@ -169,25 +181,24 @@ char *replace(char *instring,char *old,char *new)
 		count++;
 	}
 
-	free(tmp);
+	XFREE(tmp);
 
 	return out;
 }
 
 
 
-
 long parse_http_status(char * str)
 {
 	char part_str[32];
-	strncpy(part_str,str,31);
+	strlcpy(part_str,str,32);
 	char *status=strtok(part_str," ");
 	status=strtok(NULL," ");
  
-	if(strlen(status)<= 3)
+	if(strnlen(status,5)<= 3)
 	{
 
-		long code_num=(long)atoi(status);
+		long code_num=strtol(status,(char **)NULL,10);
 		return code_num;
 	} else {
 		return 0;
